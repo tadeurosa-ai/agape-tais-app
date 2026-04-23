@@ -526,16 +526,25 @@ with aba_rel:
         st.stop()
 
     with st.expander("🔍 DEBUG — remover após análise"):
-        recs = _fetch_estoque()
-        if recs:
-            sample = recs[0]
-            keys = list(sample.get("fields", {}).keys())
-            st.write("**Field keys (primeiros 5):**", keys[:5])
-            st.write("**F_DESC raw:**", sample["fields"].get("fldPkkISGo4U3iom6"))
-            st.write("**F_UNID raw:**", sample["fields"].get("fld1KRLnffGU4xwYm"))
-            st.write("**returnFieldsByFieldId funciona:**", keys[0].startswith("fld") if keys else "sem campos")
-        if itens:
-            st.write("**Primeiro item processado:**", itens[0])
+        st.write("**Total itens:**", len(itens))
+        none_items = [i for i in itens if any(v is None for v in i.values())]
+        st.write("**Itens com None no dict:**", len(none_items))
+        if none_items:
+            st.write(none_items[:2])
+        try:
+            test_pdf = gerar_relatorio_pdf(itens, "23/04/2026")
+            st.write("**PDF tipo:**", type(test_pdf).__name__, "| bytes:", len(test_pdf) if test_pdf else 0)
+        except Exception as ex:
+            st.write("**PDF ERRO:**", str(ex))
+        hist_debug = carregar_historico()
+        st.write("**Total pedidos histórico:**", len(hist_debug))
+        if hist_debug:
+            p = hist_debug[0]
+            st.write("**Pedido[0] numero:**", p["numero"])
+            st.write("**Pedido[0] data:**", p["data"])
+            st.write("**Pedido[0] itens:**", p["itens"])
+            none_hist = [i for i in p["itens"] if any(v is None for v in i.values())]
+            st.write("**Itens hist com None:**", len(none_hist))
 
     tot_total = sum(i["valor_total"] for i in itens)
     tot_recebido = sum(i["recebido"] for i in itens)
