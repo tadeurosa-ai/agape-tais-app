@@ -51,6 +51,34 @@ def _fetch_estoque():
     return records
 
 
+@st.cache_data(ttl=60)
+def _fetch_baixas():
+    headers = {"Authorization": f"Bearer {get_token()}"}
+    url = f"https://api.airtable.com/v0/{BASE_ID}/{TABLE_BAIXAS}"
+    records, params = [], {"returnFieldsByFieldId": "true"}
+    while True:
+        r = requests.get(url, headers=headers, params=params)
+        r.raise_for_status()
+        data = r.json()
+        records.extend(data.get("records", []))
+        if not data.get("offset"):
+            break
+        params["offset"] = data["offset"]
+    return records
+
+
+def _agregar_baixas():
+    totais = {}
+    for b in _fetch_baixas():
+        f = b.get("fields", {})
+        for item_id in f.get(F_B_ITEM, []):
+            if item_id not in totais:
+                totais[item_id] = {"qtd": 0.0, "valor": 0.0}
+            totais[item_id]["qtd"] += f.get(F_B_QTD, 0) or 0
+            totais[item_id]["valor"] += f.get(F_B_VALOR, 0) or 0
+    return totais
+
+
 def carregar_produtos():
     produtos = []
     for rec in _fetch_estoque():
@@ -77,6 +105,7 @@ def carregar_produtos():
 
 
 def carregar_relatorio():
+    baixas = _agregar_baixas()
     itens = []
     for rec in _fetch_estoque():
         f = rec.get("fields", {})
@@ -84,17 +113,17 @@ def carregar_relatorio():
         if enviada <= 0:
             continue
         preco = f.get(F_PRECO, 0) or 0
-        raw_saldo = f.get(F_QTD_SALDO)
-        saldo = max(0, (raw_saldo if raw_saldo is not None else enviada) or 0)
         valor_total = f.get(F_VALOR_TOTAL, 0) or round(enviada * preco, 2)
-        raw_sp = f.get(F_SALDO_PAGAR)
-        saldo_pagar = max(0, (raw_sp if raw_sp is not None else valor_total) or 0)
-        recebido = round(valor_total - saldo_pagar, 2)
+        b = baixas.get(rec["id"], {"qtd": 0.0, "valor": 0.0})
+        qtd_vendida = round(b["qtd"], 2)
+        recebido = round(b["valor"], 2)
+        saldo = max(0, round(enviada - qtd_vendida, 2))
+        saldo_pagar = max(0, round(valor_total - recebido, 2))
         itens.append({
             "descricao": f.get(F_DESC, ""),
             "unidade": f.get(F_UNID, "UN"),
             "enviada": enviada,
-            "vendida": round(enviada - saldo, 2),
+            "vendida": qtd_vendida,
             "saldo": saldo,
             "preco": preco,
             "valor_total": valor_total,
@@ -102,6 +131,23 @@ def carregar_relatorio():
             "saldo_pagar": saldo_pagar,
         })
     return sorted(itens, key=lambda x: x["descricao"])
+
+
+def carregar_historico():
+    estoque_map = {rec["id"]: rec["fields"].get(F_DESC, "?") for rec in _fetch_estoque()}
+    itens = []
+    for b in _fetch_baixas():
+        f = b.get("fields", {})
+        item_ids = f.get(F_B_ITEM, [])
+        item_nome = estoque_map.get(item_ids[0], "?") if item_ids else "?"
+        itens.append({
+            "Data": f.get(F_B_DATA, ""),
+            "Item": item_nome,
+            "Qtd": f.get(F_B_QTD, 0) or 0,
+            "Valor": f.get(F_B_VALOR, 0) or 0,
+            "Obs": f.get(F_B_OBS, "") or "",
+        })
+    return sorted(itens, key=lambda x: x["Data"], reverse=True)
 
 
 def registrar_baixas(cart):
@@ -301,7 +347,7 @@ if "pdf_recibo" not in st.session_state:
 if "numero_pedido" not in st.session_state:
     st.session_state.numero_pedido = datetime.now().strftime("%Y%m%d%H%M")
 
-aba_pag, aba_rel = st.tabs(["Registrar Pagamento", "Relatório de Estoque"])
+aba_pag, aba_rel, aba_hist = st.tabs(["Registrar Pagamento", "Relatório de Estoque", "Histórico"])
 
 # ── Aba: Registrar Pagamento ───────────────────────────────────────────────────
 
@@ -497,3 +543,35 @@ with aba_rel:
         use_container_width=True,
         height=500,
     )
+
+# ── Aba: Histórico ────────────────────────────────────────────────────────────
+
+with aba_hist:
+    st.subheader("📋 Histórico de Pagamentos")
+    if st.button("🔄 Atualizar", key="btn_hist"):
+        st.cache_data.clear()
+        st.rerun()
+
+    try:
+        hist = carregar_historico()
+    except Exception as e:
+        st.error(f"Erro ao carregar histórico: {e}")
+        st.stop()
+
+    if not hist:
+        st.info("Nenhum pagamento registrado ainda.")
+    else:
+        tot_hist = sum(i["Valor"] for i in hist)
+        st.metric("Total recebido (histórico completo)", f"R$ {tot_hist:,.2f}")
+        st.divider()
+        st.dataframe(
+            [{
+                "Data": i["Data"],
+                "Item": i["Item"],
+                "Qtd": i["Qtd"],
+                "Valor": f"R$ {i['Valor']:.2f}",
+                "Obs": i["Obs"],
+            } for i in hist],
+            use_container_width=True,
+            height=500,
+        )
