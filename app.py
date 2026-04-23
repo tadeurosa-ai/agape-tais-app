@@ -354,16 +354,14 @@ with aba_pag:
                     max_value=float(prod["saldo"]),
                     step=1.0,
                     value=float(prod["saldo"]),
-                    key="qtd_input",
                 )
             with col2:
-                valor_auto = round(qtd * valor_unit, 2) if qtd > 0 else (saldo_pagar if saldo_pagar > 0 else 0.0)
+                valor_auto = round(qtd * valor_unit, 2)
                 valor = st.number_input(
                     "Valor (R$)",
                     min_value=0.0,
                     step=0.01,
                     value=float(valor_auto),
-                    key="valor_input",
                 )
 
             obs = st.text_input(
