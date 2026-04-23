@@ -134,34 +134,53 @@ def carregar_relatorio():
 
 
 def carregar_historico():
-    estoque_map = {rec["id"]: rec["fields"].get(F_DESC) or "?" for rec in _fetch_estoque()}
-    itens = []
+    estoque_map = {
+        rec["id"]: {
+            "descricao": rec["fields"].get(F_DESC) or "?",
+            "unidade": rec["fields"].get(F_UNID) or "UN",
+        }
+        for rec in _fetch_estoque()
+    }
+    pedidos = {}
     for b in _fetch_baixas():
         f = b.get("fields", {})
+        b_id = f.get(F_B_ID) or ""
+        ped_num = b_id.split("/")[0] if "/" in b_id else (f.get(F_B_DATA) or "?")
+        if ped_num not in pedidos:
+            pedidos[ped_num] = {
+                "numero": ped_num,
+                "data": f.get(F_B_DATA) or "",
+                "itens": [],
+                "total": 0.0,
+            }
         item_ids = f.get(F_B_ITEM, [])
-        item_nome = estoque_map.get(item_ids[0], "?") if item_ids else "?"
-        itens.append({
-            "Data": f.get(F_B_DATA, ""),
-            "Item": item_nome,
-            "Qtd": f.get(F_B_QTD, 0) or 0,
-            "Valor": f.get(F_B_VALOR, 0) or 0,
-            "Obs": f.get(F_B_OBS, "") or "",
+        info = estoque_map.get(item_ids[0], {"descricao": "?", "unidade": "UN"}) if item_ids else {"descricao": "?", "unidade": "UN"}
+        qtd = f.get(F_B_QTD, 0) or 0
+        valor = f.get(F_B_VALOR, 0) or 0
+        preco = round(valor / qtd, 2) if qtd else 0.0
+        pedidos[ped_num]["itens"].append({
+            "descricao": info["descricao"],
+            "unidade": info["unidade"],
+            "qtd": qtd,
+            "preco": preco,
+            "valor": valor,
         })
-    return sorted(itens, key=lambda x: x["Data"], reverse=True)
+        pedidos[ped_num]["total"] += valor
+    return sorted(pedidos.values(), key=lambda x: x["data"], reverse=True)
 
 
-def registrar_baixas(cart):
+def registrar_baixas(cart, numero_pedido):
     headers = {
         "Authorization": f"Bearer {get_token()}",
         "Content-Type": "application/json",
     }
     hoje = date.today().isoformat()
     url = f"https://api.airtable.com/v0/{BASE_ID}/{TABLE_BAIXAS}"
-    for item in cart:
+    for idx, item in enumerate(cart):
         body = {
             "records": [{
                 "fields": {
-                    F_B_ID:    f"B-{hoje}-{item['id'][:6]}",
+                    F_B_ID:    f"{numero_pedido}/{idx + 1}",
                     F_B_DATA:  hoje,
                     F_B_ITEM:  [item["id"]],
                     F_B_QTD:   item["qtd"],
@@ -458,7 +477,7 @@ with aba_pag:
             if st.button("✅  REGISTRAR PAGAMENTO", use_container_width=True):
                 with st.spinner("Registrando..."):
                     try:
-                        registrar_baixas(st.session_state.cart)
+                        registrar_baixas(st.session_state.cart, st.session_state.numero_pedido)
                         st.cache_data.clear()
                         hoje = date.today().strftime("%d/%m/%Y")
                         pdf_bytes = gerar_recibo_pdf(
@@ -547,7 +566,7 @@ with aba_rel:
 # ── Aba: Histórico ────────────────────────────────────────────────────────────
 
 with aba_hist:
-    st.subheader("📋 Histórico de Pagamentos")
+    st.subheader("📋 Histórico de Pedidos")
     if st.button("🔄 Atualizar", key="btn_hist"):
         st.cache_data.clear()
         st.rerun()
@@ -559,19 +578,39 @@ with aba_hist:
         st.stop()
 
     if not hist:
-        st.info("Nenhum pagamento registrado ainda.")
+        st.info("Nenhum pedido registrado ainda.")
     else:
-        tot_hist = sum(i["Valor"] for i in hist)
-        st.metric("Total recebido (histórico completo)", f"R$ {tot_hist:,.2f}")
+        tot_hist = sum(p["total"] for p in hist)
+        st.metric("Total recebido (todos os pedidos)", f"R$ {tot_hist:,.2f}")
         st.divider()
-        st.dataframe(
-            [{
-                "Data": i["Data"],
-                "Item": i["Item"],
-                "Qtd": i["Qtd"],
-                "Valor": f"R$ {i['Valor']:.2f}",
-                "Obs": i["Obs"],
-            } for i in hist],
-            use_container_width=True,
-            height=500,
-        )
+        for ped in hist:
+            data_fmt = ped["data"]
+            try:
+                from datetime import datetime as _dt
+                data_fmt = _dt.strptime(ped["data"], "%Y-%m-%d").strftime("%d/%m/%Y")
+            except Exception:
+                pass
+            label = f"Pedido {ped['numero']}  ·  {data_fmt}  ·  R$ {ped['total']:.2f}"
+            with st.expander(label):
+                st.dataframe(
+                    [{
+                        "Item": i["descricao"],
+                        "Un": i["unidade"],
+                        "Qtd": i["qtd"],
+                        "Preço un": f"R$ {i['preco']:.2f}",
+                        "Total": f"R$ {i['valor']:.2f}",
+                    } for i in ped["itens"]],
+                    use_container_width=True,
+                    hide_index=True,
+                )
+                try:
+                    pdf = gerar_recibo_pdf(ped["itens"], data_fmt, ped["numero"])
+                    st.download_button(
+                        label="📄 Baixar PDF",
+                        data=pdf,
+                        file_name=f"recibo_{ped['numero']}.pdf",
+                        mime="application/pdf",
+                        key=f"dl_{ped['numero']}",
+                    )
+                except Exception as e:
+                    st.warning(f"PDF indisponível: {e}")
