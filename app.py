@@ -48,7 +48,10 @@ def carregar_produtos():
     produtos = []
     for rec in records:
         f = rec.get("fields", {})
+        enviada = f.get(F_QTD_ENVIADA, 0) or 0
         saldo = f.get(F_QTD_SALDO, 0) or 0
+        if saldo <= 0:
+            saldo = enviada
         if saldo <= 0:
             continue
         produtos.append({
