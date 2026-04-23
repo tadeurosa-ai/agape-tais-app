@@ -77,7 +77,6 @@ def carregar_produtos():
     return sorted(produtos, key=lambda x: x["descricao"])
 
 
-@st.cache_data(ttl=120)
 def carregar_relatorio():
     itens = []
     for rec in _fetch_estoque():
@@ -470,13 +469,16 @@ with aba_rel:
 
     st.divider()
     hoje_rel = date.today().strftime("%d/%m/%Y")
-    pdf_rel = gerar_relatorio_pdf(itens, hoje_rel)
-    st.download_button(
-        label="📄 Baixar Relatório PDF",
-        data=pdf_rel,
-        file_name=f"estoque_consignacao_{date.today().isoformat()}.pdf",
-        mime="application/pdf",
-    )
+    try:
+        pdf_rel = gerar_relatorio_pdf(itens, hoje_rel)
+        st.download_button(
+            label="📄 Baixar Relatório PDF",
+            data=pdf_rel,
+            file_name=f"estoque_consignacao_{date.today().isoformat()}.pdf",
+            mime="application/pdf",
+        )
+    except Exception as e:
+        st.warning(f"PDF indisponível: {e}")
 
     st.dataframe(
         [{
