@@ -1,6 +1,6 @@
 import streamlit as st
 import requests
-from datetime import date
+from datetime import date, datetime
 from fpdf import FPDF
 
 
@@ -35,6 +35,7 @@ def get_token():
     return st.secrets["AIRTABLE_TOKEN"]
 
 
+@st.cache_data(ttl=120)
 def _fetch_estoque():
     headers = {"Authorization": f"Bearer {get_token()}"}
     url = f"https://api.airtable.com/v0/{BASE_ID}/{TABLE_ESTOQUE}"
@@ -50,15 +51,13 @@ def _fetch_estoque():
     return records
 
 
-@st.cache_data(ttl=120)
 def carregar_produtos():
     produtos = []
     for rec in _fetch_estoque():
         f = rec.get("fields", {})
         enviada = f.get(F_QTD_ENVIADA, 0) or 0
-        saldo = f.get(F_QTD_SALDO, 0) or 0
-        if saldo <= 0:
-            saldo = enviada
+        raw_saldo = f.get(F_QTD_SALDO)
+        saldo = raw_saldo if raw_saldo is not None else enviada
         if saldo <= 0:
             continue
         preco = f.get(F_PRECO, 0) or 0
@@ -85,11 +84,11 @@ def carregar_relatorio():
         if enviada <= 0:
             continue
         preco = f.get(F_PRECO, 0) or 0
-        saldo = f.get(F_QTD_SALDO, 0) or 0
-        if saldo <= 0:
-            saldo = enviada
+        raw_saldo = f.get(F_QTD_SALDO)
+        saldo = max(0, (raw_saldo if raw_saldo is not None else enviada) or 0)
         valor_total = f.get(F_VALOR_TOTAL, 0) or round(enviada * preco, 2)
-        saldo_pagar = f.get(F_SALDO_PAGAR, 0) or valor_total
+        raw_sp = f.get(F_SALDO_PAGAR)
+        saldo_pagar = max(0, (raw_sp if raw_sp is not None else valor_total) or 0)
         recebido = round(valor_total - saldo_pagar, 2)
         itens.append({
             "descricao": f.get(F_DESC, ""),
@@ -300,7 +299,7 @@ if "registrado" not in st.session_state:
 if "pdf_recibo" not in st.session_state:
     st.session_state.pdf_recibo = None
 if "numero_pedido" not in st.session_state:
-    st.session_state.numero_pedido = date.today().strftime("%Y%m%d")
+    st.session_state.numero_pedido = datetime.now().strftime("%Y%m%d%H%M")
 
 aba_pag, aba_rel = st.tabs(["Registrar Pagamento", "Relatório de Estoque"])
 
@@ -422,6 +421,7 @@ with aba_pag:
                         )
                         st.session_state.pdf_recibo = pdf_bytes
                         st.session_state.registrado = True
+                        st.session_state.show_balloons = True
                         st.rerun()
                     except Exception as e:
                         st.error(f"Erro ao registrar: {e}")
@@ -430,7 +430,9 @@ with aba_pag:
 
     if st.session_state.registrado:
         st.success(f"✅ Pagamento registrado com sucesso!")
-        st.balloons()
+        if st.session_state.get("show_balloons"):
+            st.balloons()
+            st.session_state.show_balloons = False
         st.download_button(
             label="📄 Baixar Recibo PDF",
             data=st.session_state.pdf_recibo,
@@ -441,7 +443,7 @@ with aba_pag:
             st.session_state.cart = []
             st.session_state.registrado = False
             st.session_state.pdf_recibo = None
-            st.session_state.numero_pedido = date.today().strftime("%Y%m%d")
+            st.session_state.numero_pedido = datetime.now().strftime("%Y%m%d%H%M")
             st.rerun()
 
 # ── Aba: Relatório de Estoque ─────────────────────────────────────────────────
