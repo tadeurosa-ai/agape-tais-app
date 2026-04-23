@@ -246,7 +246,10 @@ def gerar_recibo_pdf(cart, hoje, numero):
     pdf.set_font("Helvetica", "", 9)
     fill = False
     for item in cart:
-        pdf.set_fill_color(245, 245, 245) if fill else pdf.set_fill_color(255, 255, 255)
+        if fill:
+            pdf.set_fill_color(245, 245, 245)
+        else:
+            pdf.set_fill_color(255, 255, 255)
         row = [
             _s(item["descricao"]),
             _s(item["unidade"]),
@@ -299,7 +302,10 @@ def gerar_relatorio_pdf(itens, hoje):
     pdf.set_font("Helvetica", "", 7)
     fill = False
     for p in itens:
-        pdf.set_fill_color(245, 245, 245) if fill else pdf.set_fill_color(255, 255, 255)
+        if fill:
+            pdf.set_fill_color(245, 245, 245)
+        else:
+            pdf.set_fill_color(255, 255, 255)
         row = [
             _s(p["descricao"])[:50],
             _s(p["unidade"]),
@@ -524,27 +530,6 @@ with aba_rel:
     except Exception as e:
         st.error(f"Erro ao carregar estoque: {e}")
         st.stop()
-
-    with st.expander("🔍 DEBUG — remover após análise"):
-        st.write("**Total itens:**", len(itens))
-        none_items = [i for i in itens if any(v is None for v in i.values())]
-        st.write("**Itens com None no dict:**", len(none_items))
-        if none_items:
-            st.write(none_items[:2])
-        try:
-            test_pdf = gerar_relatorio_pdf(itens, "23/04/2026")
-            st.write("**PDF tipo:**", type(test_pdf).__name__, "| bytes:", len(test_pdf) if test_pdf else 0)
-        except Exception as ex:
-            st.write("**PDF ERRO:**", str(ex))
-        hist_debug = carregar_historico()
-        st.write("**Total pedidos histórico:**", len(hist_debug))
-        if hist_debug:
-            p = hist_debug[0]
-            st.write("**Pedido[0] numero:**", p["numero"])
-            st.write("**Pedido[0] data:**", p["data"])
-            st.write("**Pedido[0] itens:**", p["itens"])
-            none_hist = [i for i in p["itens"] if any(v is None for v in i.values())]
-            st.write("**Itens hist com None:**", len(none_hist))
 
     tot_total = sum(i["valor_total"] for i in itens)
     tot_recebido = sum(i["recebido"] for i in itens)
