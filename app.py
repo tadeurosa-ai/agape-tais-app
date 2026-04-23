@@ -127,6 +127,15 @@ except Exception as e:
     st.error(f"Erro ao carregar produtos: {e}")
     st.stop()
 
+# DEBUG TEMPORÁRIO — remover após teste
+import requests as _req
+_dbg_r = _req.get(
+    f"https://api.airtable.com/v0/{BASE_ID}/{TABLE_ESTOQUE}",
+    headers={"Authorization": f"Bearer {get_token()}"},
+    params={"maxRecords": 1},
+)
+st.warning(f"DEBUG — status {_dbg_r.status_code} | registros brutos: {len(_dbg_r.json().get('records',[]))} | primeiro campo: {list(_dbg_r.json().get('records',[{}])[0].get('fields',{}).items())[:3] if _dbg_r.json().get('records') else 'vazio'}")
+
 if not produtos:
     st.success("✅ Todos os itens já foram pagos!")
     st.stop()
