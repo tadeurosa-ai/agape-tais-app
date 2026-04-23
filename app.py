@@ -92,8 +92,8 @@ def carregar_produtos():
         saldo_pagar = f.get(F_SALDO_PAGAR, 0) or 0
         produtos.append({
             "id": rec["id"],
-            "descricao": f.get(F_DESC, ""),
-            "unidade": f.get(F_UNID, "UN"),
+            "descricao": f.get(F_DESC) or "",
+            "unidade": f.get(F_UNID) or "UN",
             "saldo": saldo,
             "enviada": enviada,
             "preco": preco,
@@ -120,8 +120,8 @@ def carregar_relatorio():
         saldo = max(0, round(enviada - qtd_vendida, 2))
         saldo_pagar = max(0, round(valor_total - recebido, 2))
         itens.append({
-            "descricao": f.get(F_DESC, ""),
-            "unidade": f.get(F_UNID, "UN"),
+            "descricao": f.get(F_DESC) or "",
+            "unidade": f.get(F_UNID) or "UN",
             "enviada": enviada,
             "vendida": qtd_vendida,
             "saldo": saldo,
@@ -134,7 +134,7 @@ def carregar_relatorio():
 
 
 def carregar_historico():
-    estoque_map = {rec["id"]: rec["fields"].get(F_DESC, "?") for rec in _fetch_estoque()}
+    estoque_map = {rec["id"]: rec["fields"].get(F_DESC) or "?" for rec in _fetch_estoque()}
     itens = []
     for b in _fetch_baixas():
         f = b.get("fields", {})
