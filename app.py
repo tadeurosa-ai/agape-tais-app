@@ -525,6 +525,18 @@ with aba_rel:
         st.error(f"Erro ao carregar estoque: {e}")
         st.stop()
 
+    with st.expander("🔍 DEBUG — remover após análise"):
+        recs = _fetch_estoque()
+        if recs:
+            sample = recs[0]
+            keys = list(sample.get("fields", {}).keys())
+            st.write("**Field keys (primeiros 5):**", keys[:5])
+            st.write("**F_DESC raw:**", sample["fields"].get("fldPkkISGo4U3iom6"))
+            st.write("**F_UNID raw:**", sample["fields"].get("fld1KRLnffGU4xwYm"))
+            st.write("**returnFieldsByFieldId funciona:**", keys[0].startswith("fld") if keys else "sem campos")
+        if itens:
+            st.write("**Primeiro item processado:**", itens[0])
+
     tot_total = sum(i["valor_total"] for i in itens)
     tot_recebido = sum(i["recebido"] for i in itens)
     tot_saldo = sum(i["saldo_pagar"] for i in itens)
