@@ -162,7 +162,7 @@ if escolha:
             "Valor recebido (R$)",
             min_value=0.0,
             step=0.01,
-            value=0.0,
+            value=float(prod["saldo_pagar"]) if prod["saldo_pagar"] > 0 else 0.0,
         )
 
     obs = st.text_area("Observação (opcional)", height=80, placeholder="Ex: parcela 1/2, devolução, etc.")
