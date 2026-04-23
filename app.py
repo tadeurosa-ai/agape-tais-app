@@ -3,6 +3,14 @@ import requests
 from datetime import date
 from fpdf import FPDF
 
+
+def _s(text):
+    """Converte para Latin-1 seguro para FPDF (substitui chars fora do range)."""
+    return (str(text)
+            .replace("—", "-").replace("–", "-")
+            .replace("‘", "'").replace("’", "'")
+            .encode("latin-1", "replace").decode("latin-1"))
+
 st.set_page_config(
     page_title="Ferragem Agápè — Consignação",
     page_icon="💰",
@@ -134,9 +142,9 @@ def registrar_baixa(item_id, qtd, valor, obs):
 
 def _header_pdf(pdf, titulo):
     pdf.set_font("Helvetica", "B", 13)
-    pdf.cell(0, 8, "FERRAGEM AGÁPÈ — CONSIGNAÇÃO", ln=True, align="C")
+    pdf.cell(0, 8, _s("FERRAGEM AGÁPÈ - CONSIGNAÇÃO"), ln=True, align="C")
     pdf.set_font("Helvetica", "", 10)
-    pdf.cell(0, 5, titulo, ln=True, align="C")
+    pdf.cell(0, 5, _s(titulo), ln=True, align="C")
     pdf.ln(5)
 
 
@@ -167,7 +175,7 @@ def gerar_recibo_pdf(prod, qtd, valor, obs, hoje):
 
     total_item = round(qtd * prod["preco"], 2)
     pdf.set_font("Helvetica", "", 9)
-    row = [prod["descricao"], prod["unidade"], f"{qtd:.2f}",
+    row = [_s(prod["descricao"]), _s(prod["unidade"]), f"{qtd:.2f}",
            f"R$ {prod['preco']:.2f}", f"R$ {total_item:.2f}"]
     for i, v in enumerate(row):
         pdf.cell(cw[i], 7, v, border=1, align=alns[i])
@@ -183,7 +191,7 @@ def gerar_recibo_pdf(prod, qtd, valor, obs, hoje):
     if obs:
         pdf.ln(4)
         pdf.set_font("Helvetica", "", 9)
-        pdf.multi_cell(0, 5, f"Observação: {obs}")
+        pdf.multi_cell(0, 5, _s(f"Observacao: {obs}"))
 
     return bytes(pdf.output())
 
@@ -210,8 +218,8 @@ def gerar_relatorio_pdf(itens, hoje):
     pdf.set_font("Helvetica", "", 7)
     for p in itens:
         row = [
-            p["descricao"][:50],
-            p["unidade"],
+            _s(p["descricao"])[:50],
+            _s(p["unidade"]),
             f"{p['enviada']:.0f}",
             f"{p['vendida']:.0f}",
             f"{p['saldo']:.0f}",
@@ -229,7 +237,7 @@ def gerar_relatorio_pdf(itens, hoje):
 
     pdf.set_font("Helvetica", "B", 8)
     pdf.set_fill_color(220, 220, 220)
-    pdf.cell(sum(cw[:5]), 7, f"TOTAL  ({len(itens)} itens)", border=1, fill=True, align="R")
+    pdf.cell(sum(cw[:5]), 7, _s(f"TOTAL  ({len(itens)} itens)"), border=1, fill=True, align="R")
     pdf.cell(cw[5], 7, "", border=1, fill=True)
     pdf.cell(cw[6], 7, f"{tot_total:.2f}", border=1, fill=True, align="R")
     pdf.cell(cw[7], 7, f"{tot_recebido:.2f}", border=1, fill=True, align="R")
