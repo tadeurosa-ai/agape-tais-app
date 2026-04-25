@@ -203,7 +203,7 @@ def gerar_recibo_pdf(cart, hoje, numero):
 
     # Cabeçalho estilo pedido de venda
     pdf.set_font("Helvetica", "B", 14)
-    pdf.cell(0, 9, _s("FERRAGEM AGÁPÈ"), ln=True, align="C")
+    pdf.cell(0, 9, _s("ÁGAPE FERRAGEM"), ln=True, align="C")
     pdf.set_font("Helvetica", "", 9)
     pdf.cell(0, 5, _s("Consignação de produtos"), ln=True, align="C")
     pdf.ln(4)
@@ -280,7 +280,7 @@ def gerar_relatorio_pdf(itens, hoje):
     ew = pdf.epw
 
     pdf.set_font("Helvetica", "B", 13)
-    pdf.cell(0, 8, _s("FERRAGEM AGÁPÈ - CONSIGNAÇÃO"), ln=True, align="C")
+    pdf.cell(0, 8, _s("ÁGAPE FERRAGEM - CONSIGNAÇÃO"), ln=True, align="C")
     pdf.set_font("Helvetica", "", 10)
     pdf.cell(0, 5, _s(f"Relatorio de Estoque - {hoje}"), ln=True, align="C")
     pdf.ln(5)
@@ -340,7 +340,7 @@ def gerar_relatorio_pdf(itens, hoje):
 # ── Estilo ─────────────────────────────────────────────────────────────────────
 
 st.set_page_config(
-    page_title="Ferragem Agápè — Consignação",
+    page_title="Ágape Ferragem — Consignação",
     page_icon="💰",
     layout="centered",
 )
@@ -359,7 +359,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("💰 Ferragem Agápè — Consignação")
+st.title("💰 Ágape Ferragem — Consignação")
 st.divider()
 
 # Session state
@@ -426,12 +426,7 @@ with aba_pag:
                 )
             with col2:
                 valor_auto = round(qtd * valor_unit, 2)
-                valor = st.number_input(
-                    "Valor (R$)",
-                    min_value=0.0,
-                    step=0.01,
-                    value=float(valor_auto),
-                )
+                st.metric("Valor (R$)", f"R$ {valor_auto:.2f}")
 
             obs = st.text_input(
                 "Observação (opcional)",
@@ -440,7 +435,7 @@ with aba_pag:
             )
 
             if st.button("➕  Adicionar ao Pedido", use_container_width=True):
-                if qtd <= 0 or valor <= 0:
+                if qtd <= 0 or valor_auto <= 0:
                     st.warning("Preencha quantidade e valor.")
                 else:
                     st.session_state.cart.append({
@@ -449,7 +444,7 @@ with aba_pag:
                         "unidade": prod["unidade"],
                         "qtd": qtd,
                         "preco": valor_unit,
-                        "valor": valor,
+                        "valor": valor_auto,
                         "obs": obs,
                     })
                     st.rerun()
